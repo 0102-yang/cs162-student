@@ -22,13 +22,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <assert.h>
+#include <ctype.h>
 #include <getopt.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "word_count.h"
 
@@ -44,7 +44,7 @@ WordCount *word_counts = NULL;
  * Returns the total amount of words found in infile.
  * Useful functions: fgetc(), isalpha().
  */
-int num_words(FILE* infile) {
+int num_words(FILE *infile) {
   int num_words = 0;
 
   return num_words;
@@ -55,15 +55,13 @@ int num_words(FILE* infile) {
  *
  * Given infile, extracts and adds each word in the FILE to `wclist`.
  * Useful functions: fgetc(), isalpha(), tolower(), add_word().
- * 
+ *
  * As mentioned in the spec, your code should not panic or
  * segfault on errors. Thus, this function should return
  * 1 in the event of any errors (e.g. wclist or infile is NULL)
  * and 0 otherwise.
  */
-int count_words(WordCount **wclist, FILE *infile) {
-  return 0;
-}
+int count_words(WordCount **wclist, FILE *infile) { return 0; }
 
 /*
  * Comparator to sort list by frequency.
@@ -75,18 +73,21 @@ static bool wordcount_less(const WordCount *wc1, const WordCount *wc2) {
 
 // In trying times, displays a helpful message.
 static int display_help(void) {
-	printf("Flags:\n"
-	    "--count (-c): Count the total amount of words in the file, or STDIN if a file is not specified. This is default behavior if no flag is specified.\n"
-	    "--frequency (-f): Count the frequency of each word in the file, or STDIN if a file is not specified.\n"
-	    "--help (-h): Displays this help message.\n");
-	return 0;
+  printf(
+      "Flags:\n"
+      "--count (-c): Count the total amount of words in the file, or STDIN if "
+      "a file is not specified. This is default behavior if no flag is "
+      "specified.\n"
+      "--frequency (-f): Count the frequency of each word in the file, or "
+      "STDIN if a file is not specified.\n"
+      "--help (-h): Displays this help message.\n");
+  return 0;
 }
 
 /*
  * Handle command line flags and arguments.
  */
-int main (int argc, char *argv[]) {
-
+int main(int argc, char *argv[]) {
   // Count Mode (default): outputs the total amount of words counted
   bool count_mode = true;
   int total_words = 0;
@@ -98,28 +99,25 @@ int main (int argc, char *argv[]) {
 
   // Variables for command line argument parsing
   int i;
-  static struct option long_options[] =
-  {
-      {"count", no_argument, 0, 'c'},
-      {"frequency", no_argument, 0, 'f'},
-      {"help", no_argument, 0, 'h'},
-      {0, 0, 0, 0}
-  };
+  static struct option long_options[] = {{"count", no_argument, 0, 'c'},
+                                         {"frequency", no_argument, 0, 'f'},
+                                         {"help", no_argument, 0, 'h'},
+                                         {0, 0, 0, 0}};
 
   // Sets flags
   while ((i = getopt_long(argc, argv, "cfh", long_options, NULL)) != -1) {
-      switch (i) {
-          case 'c':
-              count_mode = true;
-              freq_mode = false;
-              break;
-          case 'f':
-              count_mode = false;
-              freq_mode = true;
-              break;
-          case 'h':
-              return display_help();
-      }
+    switch (i) {
+      case 'c':
+        count_mode = true;
+        freq_mode = false;
+        break;
+      case 'f':
+        count_mode = false;
+        freq_mode = true;
+        break;
+      case 'h':
+        return display_help();
+    }
   }
 
   if (!count_mode && !freq_mode) {
@@ -146,6 +144,6 @@ int main (int argc, char *argv[]) {
 
     printf("The frequencies of each word are: \n");
     fprint_words(word_counts, stdout);
-}
+  }
   return 0;
 }
