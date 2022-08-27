@@ -47,6 +47,21 @@ WordCount *word_counts = NULL;
 int num_words(FILE *infile) {
   int num_words = 0;
 
+  bool in_word = false;
+  while (!feof(infile)) {
+    char c = fgetc(infile);
+    if (in_word) {
+      if (!isalpha(c)) {
+        in_word = false;
+      }
+    } else {
+      if (isalpha(c)) {
+        num_words++;
+        in_word = true;
+      }
+    }
+  }
+
   return num_words;
 }
 
@@ -61,14 +76,49 @@ int num_words(FILE *infile) {
  * 1 in the event of any errors (e.g. wclist or infile is NULL)
  * and 0 otherwise.
  */
-int count_words(WordCount **wclist, FILE *infile) { return 0; }
+int count_words(WordCount **wclist, FILE *infile) {
+  if (!wclist || !infile) {
+    return 1;
+  }
+
+  char buffer[MAX_WORD_LEN];
+  unsigned short index = 0;
+  bool in_word = false;
+
+  while (!feof(infile)) {
+    char c = fgetc(infile);
+    if (in_word) {
+      if (isalpha(c)) {
+        buffer[index++] = tolower(c);
+      } else {
+        buffer[index] = '\0';
+        index = 0;
+        add_word(wclist, buffer);
+        in_word = false;
+      }
+    } else {
+      if (isalpha(c)) {
+        in_word = true;
+        buffer[index++] = tolower(c);
+      }
+    }
+  }
+
+  return 0;
+}
 
 /*
  * Comparator to sort list by frequency.
  * Useful function: strcmp().
  */
 static bool wordcount_less(const WordCount *wc1, const WordCount *wc2) {
-  return 0;
+  if (wc1->count < wc2->count) {
+    return true;
+  } else if (wc1->count > wc2->count) {
+    return false;
+  } else {
+    return strcmp(wc1->word, wc2->word) < 0;
+  }
 }
 
 // In trying times, displays a helpful message.
@@ -135,6 +185,20 @@ int main(int argc, char *argv[]) {
     // At least one file specified. Useful functions: fopen(), fclose().
     // The first file can be found at argv[optind]. The last file can be
     // found at argv[argc-1].
+    for (i = optind; i < argc; i++) {
+      infile = fopen(argv[i], "r");
+      if (!infile) {
+        continue;
+      }
+
+      if (count_mode) {
+        total_words += num_words(infile);
+      }
+      if (freq_mode) {
+        count_words(&word_counts, infile);
+      }
+      fclose(infile);
+    }
   }
 
   if (count_mode) {
