@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "lwords",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "PINTOS_LIST"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "intelliSenseMode": "linux-clang-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        },
+        {
+            "name": "pwords",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "PINTOS_LIST",
+                "PTHREADS"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "intelliSenseMode": "linux-clang-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}
