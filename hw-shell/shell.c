@@ -1,19 +1,20 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <signal.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
 
 #include "tokenizer.h"
 
-/* Convenience macro to silence compiler warnings about unused function parameters. */
+/* Convenience macro to silence compiler warnings about unused function
+ * parameters. */
 #define unused __attribute__((unused))
 
 /* Whether the shell is connected to an actual terminal or not. */
@@ -30,6 +31,8 @@ pid_t shell_pgid;
 
 int cmd_exit(struct tokens* tokens);
 int cmd_help(struct tokens* tokens);
+int cmd_cd(struct tokens* tokens);
+int cmd_pwd(struct tokens* tokens);
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens* tokens);
@@ -44,7 +47,10 @@ typedef struct fun_desc {
 fun_desc_t cmd_table[] = {
     {cmd_help, "?", "show this help menu"},
     {cmd_exit, "exit", "exit the command shell"},
-};
+    {cmd_cd, "cd",
+     "Changes the current working directory to that specified directory"},
+    {cmd_pwd, "pwd",
+     "Prints the current working directory to standard output"}};
 
 /* Prints a helpful description for the given command */
 int cmd_help(unused struct tokens* tokens) {
@@ -56,11 +62,25 @@ int cmd_help(unused struct tokens* tokens) {
 /* Exits this shell */
 int cmd_exit(unused struct tokens* tokens) { exit(0); }
 
+/* Changes the current working directory to that specified directory */
+int cmd_cd(struct tokens* tokens) {
+  char* path = tokens_get_token(tokens, 1);
+  chdir(path);
+  return 1;
+}
+
+/* Prints the current working directory to standard output */
+int cmd_pwd(unused struct tokens* tokens) {
+  char* cwd = getcwd(NULL, 0);
+  printf("%s\n", cwd);
+  free(cwd);
+  return 1;
+}
+
 /* Looks up the built-in command, if it exists. */
 int lookup(char cmd[]) {
   for (unsigned int i = 0; i < sizeof(cmd_table) / sizeof(fun_desc_t); i++)
-    if (cmd && (strcmp(cmd_table[i].cmd, cmd) == 0))
-      return i;
+    if (cmd && (strcmp(cmd_table[i].cmd, cmd) == 0)) return i;
   return -1;
 }
 
@@ -73,9 +93,9 @@ void init_shell() {
   shell_is_interactive = isatty(shell_terminal);
 
   if (shell_is_interactive) {
-    /* If the shell is not currently in the foreground, we must pause the shell until it becomes a
-     * foreground process. We use SIGTTIN to pause the shell. When the shell gets moved to the
-     * foreground, we'll receive a SIGCONT. */
+    /* If the shell is not currently in the foreground, we must pause the shell
+     * until it becomes a foreground process. We use SIGTTIN to pause the shell.
+     * When the shell gets moved to the foreground, we'll receive a SIGCONT. */
     while (tcgetpgrp(shell_terminal) != (shell_pgid = getpgrp()))
       kill(-shell_pgid, SIGTTIN);
 
@@ -97,8 +117,7 @@ int main(unused int argc, unused char* argv[]) {
   int line_num = 0;
 
   /* Please only print shell prompts when standard input is not a tty */
-  if (shell_is_interactive)
-    fprintf(stdout, "%d: ", line_num);
+  if (shell_is_interactive) fprintf(stdout, "%d: ", line_num);
 
   while (fgets(line, 4096, stdin)) {
     /* Split our line into words. */
@@ -111,7 +130,24 @@ int main(unused int argc, unused char* argv[]) {
       cmd_table[fundex].fun(tokens);
     } else {
       /* REPLACE this to run commands as programs. */
-      fprintf(stdout, "This shell doesn't know how to run programs.\n");
+      // fprintf(stdout, "This shell doesn't know how to run programs.\n");
+      pid_t cpid = fork();
+      if (cpid == 0) {
+        // Child process.
+        // Create arguments pointers array.
+        int argc = tokens_get_length(tokens) + 1;
+        char* argv[argc];
+        for (size_t i = 0; i < argc - 1; i++) {
+          argv[i] = tokens_get_token(tokens, i);
+        }
+        argv[argc - 1] = NULL;
+
+        // Execute program.
+        execv(tokens_get_token(tokens, 0), argv);
+      } else if (cpid > 0) {
+        // Parent process.
+        wait(NULL);
+      }
     }
 
     if (shell_is_interactive)
