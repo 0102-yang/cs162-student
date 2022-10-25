@@ -115,6 +115,8 @@ int main(unused int argc, unused char* argv[]) {
 
   static char line[4096];
   int line_num = 0;
+  char* pathstr = getenv("PATH");
+  char* delim = ":";
 
   /* Please only print shell prompts when standard input is not a tty */
   if (shell_is_interactive) fprintf(stdout, "%d: ", line_num);
@@ -126,28 +128,42 @@ int main(unused int argc, unused char* argv[]) {
     /* Find which built-in function to run. */
     int fundex = lookup(tokens_get_token(tokens, 0));
 
-    if (fundex >= 0) {
+    if (fundex >= 0)
       cmd_table[fundex].fun(tokens);
-    } else {
+    else {
       /* REPLACE this to run commands as programs. */
       // fprintf(stdout, "This shell doesn't know how to run programs.\n");
       pid_t cpid = fork();
       if (cpid == 0) {
         // Child process.
         // Create arguments pointers array.
+        char* relative_path = tokens_get_token(tokens, 0);
         int argc = tokens_get_length(tokens) + 1;
         char* argv[argc];
-        for (size_t i = 0; i < argc - 1; i++) {
+        for (size_t i = 0; i < argc - 1; i++)
           argv[i] = tokens_get_token(tokens, i);
-        }
+
         argv[argc - 1] = NULL;
 
         // Execute program.
-        execv(tokens_get_token(tokens, 0), argv);
-      } else if (cpid > 0) {
+        execv(relative_path, argv);
+
+        // Need environment variables.
+        char absolute_path[128];
+        for (char* prefix_path = strtok(pathstr, delim); prefix_path;
+             prefix_path = strtok(NULL, delim)) {
+          strcpy(absolute_path, prefix_path);
+          strcat(absolute_path, "/");
+          strcat(absolute_path, relative_path);
+          execv(absolute_path, argv);
+        }
+
+        // Command not found.
+        printf("%s: command not found\n", relative_path);
+        exit(0);
+      } else if (cpid > 0)
         // Parent process.
         wait(NULL);
-      }
     }
 
     if (shell_is_interactive)
