@@ -1,7 +1,8 @@
+#include "tokenizer.h"
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#include "tokenizer.h"
 
 struct tokens {
   size_t tokens_length;
@@ -25,9 +26,7 @@ static void* copy_word(char* source, size_t n) {
 }
 
 struct tokens* tokenize(const char* line) {
-  if (line == NULL) {
-    return NULL;
-  }
+  if (line == NULL) return NULL;
 
   static char token[4096];
   size_t n = 0, n_max = 4096;
@@ -84,8 +83,7 @@ struct tokens* tokenize(const char* line) {
         token[n++] = c;
       }
     }
-    if (n + 1 >= n_max)
-      abort();
+    if (n + 1 >= n_max) abort();
   }
 
   if (n > 0) {
@@ -97,33 +95,37 @@ struct tokens* tokenize(const char* line) {
 }
 
 size_t tokens_get_length(struct tokens* tokens) {
-  if (tokens == NULL) {
+  if (tokens == NULL)
     return 0;
-  } else {
+  else
     return tokens->tokens_length;
-  }
 }
 
 char* tokens_get_token(struct tokens* tokens, size_t n) {
-  if (tokens == NULL || n >= tokens->tokens_length) {
+  if (tokens == NULL || n >= tokens->tokens_length)
     return NULL;
-  } else {
+  else
     return tokens->tokens[n];
-  }
 }
 
 void tokens_destroy(struct tokens* tokens) {
-  if (tokens == NULL) {
-    return;
-  }
-  for (int i = 0; i < tokens->tokens_length; i++) {
-    free(tokens->tokens[i]);
-  }
-  for (int i = 0; i < tokens->buffers_length; i++) {
-    free(tokens->buffers[i]);
-  }
-  if (tokens->tokens) {
-    free(tokens->tokens);
-  }
+  if (tokens == NULL) return;
+
+  for (int i = 0; i < tokens->tokens_length; i++) free(tokens->tokens[i]);
+
+  for (int i = 0; i < tokens->buffers_length; i++) free(tokens->buffers[i]);
+
+  if (tokens->tokens) free(tokens->tokens);
+
   free(tokens);
+}
+
+int is_contains_word(struct tokens* tokens, const char* word) {
+  size_t length = tokens_get_length(tokens);
+  char* token_word;
+  for (size_t i = 0; i < length; i++) {
+    token_word = tokens_get_token(tokens, i);
+    if (strcmp(word, token_word) == 0) return 1;
+  }
+  return 0;
 }

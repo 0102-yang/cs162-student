@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 /* A struct that represents a list of words. */
 struct tokens;
 
@@ -14,3 +15,5 @@ char* tokens_get_token(struct tokens* tokens, size_t n);
 
 /* Free the memory */
 void tokens_destroy(struct tokens* tokens);
+
+int is_contains_word(struct tokens* tokens, const char* word);
