@@ -17,6 +17,11 @@
  * parameters. */
 #define unused __attribute__((unused))
 
+/* Global environment variables. */
+const char* INPUT_FILE = "./.input";
+const char* OUTPUT_FILE = "./.output";
+const size_t BUF_SIZE = 4096;
+
 /* Whether the shell is connected to an actual terminal or not. */
 bool shell_is_interactive;
 
@@ -111,35 +116,46 @@ void init_shell() {
 }
 
 /*
- * Execute program by [offset~offset+argc) tokens in struct tokens.
+ * Execute program by [offset~offset+argc) tokens arguments in struct tokens.
+ * The program will be execute in child process. The stdin will be redirect to *
+ * ind and stdout will be redirect to outd.
  */
-void execute_program(struct tokens* tokens, size_t offset, size_t argc) {
-  /* Create arguments pointers array. */
-  char* relative_path = tokens_get_token(tokens, offset);
-  char* argv[argc + 1];
-  for (size_t i = 0; i < argc; i++)
-    argv[i] = tokens_get_token(tokens, offset + i);
+void execute_program(struct tokens* tokens, size_t offset, size_t argc,
+                     int indes, int outdes) {
+  pid_t cpid = fork();
+  if (cpid == 0) {
+    // Redirect stdin and stdout.
+    dup2(indes, STDIN_FILENO);
+    dup2(outdes, STDOUT_FILENO);
+    /* Create arguments pointers array. */
+    char* relative_path = tokens_get_token(tokens, offset);
+    char* argv[argc + 1];
+    for (size_t i = 0; i < argc; i++)
+      argv[i] = tokens_get_token(tokens, offset + i);
 
-  argv[argc] = NULL;
+    argv[argc] = NULL;
 
-  // Execute program.
-  execv(relative_path, argv);
+    // Execute program.
+    execv(relative_path, argv);
 
-  // Need environment variables to get absolute path
-  // to run program.
-  char* pathstr = getenv("PATH");
-  char absolute_path[128];
-  for (char* prefix_path = strtok(pathstr, ":"); prefix_path;
-       prefix_path = strtok(NULL, ":")) {
-    strcpy(absolute_path, prefix_path);
-    strcat(absolute_path, "/");
-    strcat(absolute_path, relative_path);
-    execv(absolute_path, argv);
+    // Need environment variables to get absolute path
+    // to run program.
+    char* pathstr = getenv("PATH");
+    char absolute_path[128];
+    for (char* prefix_path = strtok(pathstr, ":"); prefix_path;
+         prefix_path = strtok(NULL, ":")) {
+      strcpy(absolute_path, prefix_path);
+      strcat(absolute_path, "/");
+      strcat(absolute_path, relative_path);
+      execv(absolute_path, argv);
+    }
+
+    // Command not found.
+    printf("%s: command not found\n", relative_path);
+    exit(0);
+  } else {
+    wait(NULL);
   }
-  free(pathstr);
-
-  // Command not found.
-  printf("%s: command not found\n", relative_path);
 }
 
 int main(unused int argc, unused char* argv[]) {
@@ -151,7 +167,7 @@ int main(unused int argc, unused char* argv[]) {
   /* Please only print shell prompts when standard input is not a tty */
   if (shell_is_interactive) fprintf(stdout, "%d: ", line_num);
 
-  while (fgets(line, 4096, stdin)) {
+  while (fgets(line, BUF_SIZE, stdin)) {
     /* Split our line into words. */
     struct tokens* tokens = tokenize(line);
 
@@ -162,34 +178,74 @@ int main(unused int argc, unused char* argv[]) {
       cmd_table[fundex].fun(tokens);
     else {
       /* Need to run specified program in command-line. */
-      pid_t cpid = fork();
-      if (cpid == 0) {
-        /* Child process. */
-        // Get total command arguments count.
-        size_t command_argc = tokens_get_length(tokens);
+      // Get total command arguments count(s).
+      size_t command_argc = tokens_get_length(tokens);
+      int filedes;
 
+      if (is_contains_word(tokens, "|")) {
+        // Pipes.
+        // Get the number of process to be run.
+        int input_filedes = open(INPUT_FILE, O_CREAT | O_RDWR, S_IRWXU);
+        int output_filedes = open(OUTPUT_FILE, O_CREAT | O_RDWR, S_IRWXU);
+        char buf[BUF_SIZE];
+
+        // Clear file.
+        ftruncate(input_filedes, 0);
+        ftruncate(output_filedes, 0);
+
+        size_t process_num = 1;
+        size_t tokens_len = tokens_get_length(tokens);
+        for (size_t i = 0; i < tokens_len; i++)
+          if (!strcmp(tokens_get_token(tokens, i), "|")) process_num++;
+
+        size_t slow = 0, fast = 0;
+        for (size_t i = 0; i < process_num; i++) {
+          // Execute next program.
+          while (fast < tokens_len &&
+                 strcmp(tokens_get_token(tokens, fast), "|"))
+            fast++;
+
+          lseek(input_filedes, 0, SEEK_SET);
+          execute_program(tokens, slow, fast - slow, input_filedes,
+                          output_filedes);
+
+          // Move cotent of output file to input file as the input of
+          // next program.
+          ftruncate(input_filedes, 0);
+          lseek(output_filedes, 0, SEEK_SET);
+          ssize_t len;
+          while ((len = read(output_filedes, buf, BUF_SIZE)) > 0)
+            write(input_filedes, buf, len);
+          ftruncate(output_filedes, 0);
+
+          slow = ++fast;
+        }
+
+        // Print result to console.
+        lseek(input_filedes, 0, SEEK_SET);
+        ssize_t len;
+        while ((len = read(input_filedes, buf, BUF_SIZE)) > 0)
+          write(STDIN_FILENO, buf, len);
+
+        // Close.
+        close(input_filedes), close(output_filedes);
+      } else if (is_contains_word(tokens, ">")) {
         // Redirection >.
-        if (is_contains_word(tokens, ">")) {
-          char* filename = tokens_get_token(tokens, command_argc - 1);
-          freopen(filename, "w", stdout);
-          execute_program(tokens, 0, command_argc - 2);
-        }
-
+        char* filename = tokens_get_token(tokens, command_argc - 1);
+        filedes = open(filename, O_CREAT | O_WRONLY);
+        execute_program(tokens, 0, command_argc - 2, STDIN_FILENO, filedes);
+        close(filedes);
+      } else if (is_contains_word(tokens, "<")) {
         // Redirection <.
-        if (is_contains_word(tokens, "<")) {
-          char* filename = tokens_get_token(tokens, command_argc - 1);
-          freopen(filename, "r", stdin);
-          execute_program(tokens, 0, command_argc - 2);
-        }
-
+        char* filename = tokens_get_token(tokens, command_argc - 1);
+        filedes = open(filename, O_RDONLY);
+        dup2(filedes, STDIN_FILENO);
+        execute_program(tokens, 0, command_argc - 2, filedes, STDOUT_FILENO);
+        close(filedes);
+      } else {
         // Run program.
-        execute_program(tokens, 0, command_argc);
-
-        // If none of the above happens, exits the child process.
-        exit(0);
-      } else if (cpid > 0)
-        // Parent process.
-        wait(NULL);
+        execute_program(tokens, 0, command_argc, STDIN_FILENO, STDOUT_FILENO);
+      }
     }
 
     if (shell_is_interactive)
