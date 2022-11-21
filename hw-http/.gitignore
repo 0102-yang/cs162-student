@@ -6,6 +6,11 @@ poolserver
 *.png
 *.jpg
 *.txt
+# Ignore performance analysis.
+!performance_analysis/httpserver.txt
+!performance_analysis/forkserver.txt
+!performance_analysis/threadserver.txt
+!performance_analysis/poolserver.txt
 # Ignore anything students add to the www/ directory
 www/**
 !www/index.html
@@ -15,3 +20,5 @@ www/**
 !www/my_documents/http-meme.png
 !www/my_documents/WEB_SCALE.jpg
 !www/my_documents/wholesome_facts.txt
+
+.vscode

@@ -1,5 +1,7 @@
-#include <stdlib.h>
 #include "wq.h"
+
+#include <stdlib.h>
+
 #include "utlist.h"
 
 /* Initializes a work queue WQ. */
@@ -14,8 +16,7 @@ void wq_init(wq_t* wq) {
  * is at least one item on the queue. */
 int wq_pop(wq_t* wq) {
   pthread_mutex_lock(&wq->mutex);
-  while (wq->size == 0)
-    pthread_cond_wait(&wq->condvar, &wq->mutex);
+  while (wq->size == 0) pthread_cond_wait(&wq->condvar, &wq->mutex);
   wq_item_t* wq_item = wq->head;
   int client_socket_fd = wq->head->client_socket_fd;
   wq->size--;

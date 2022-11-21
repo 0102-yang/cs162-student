@@ -7,7 +7,7 @@
  * waiting to be served. */
 
 typedef struct wq_item {
-  int client_socket_fd; // Client socket to be served.
+  int client_socket_fd;  // Client socket to be served.
   struct wq_item* next;
   struct wq_item* prev;
 } wq_item_t;
@@ -17,7 +17,7 @@ typedef struct wq {
   wq_item_t* head;
   pthread_mutex_t mutex;
   pthread_cond_t condvar;
-  /* TODO: More stuff here, maybe? */
+  /** DONE: More stuff here, maybe? */
 } wq_t;
 
 void wq_init(wq_t* wq);
